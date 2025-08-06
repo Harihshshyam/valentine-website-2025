@@ -1,4 +1,4 @@
-name: Deploy Valentine Site
+name: Deploy to EC2 via SSH
 
 on:
   push:
@@ -8,32 +8,30 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
-        working-directory: .  # ensures package.json is found at repo root
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Debug repo
+      - name: Configure SSH key
+        env:
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
-          echo "Working dir: $PWD"
-          ls -R .
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H 43.205.230.57 >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
 
-      - name: Install SSH key
-        uses: shimataro/ssh-key-action@v2
-        with:
-          key: ${{ secrets.SSH_KEY }}
-          known_hosts: ${{ secrets.KNOWN_HOSTS }}
-
-      - name: Deploy via SSH
+      - name: SSH and run deploy commands
+        env:
+          SSH_USER: ubuntu
+          SSH_HOST: 43.205.230.57
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
-            cd /var/www/valentine-site
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa $SSH_USER@$SSH_HOST << 'EOF'
+            cd /home/ubuntu/valentine-website-2025
             git pull origin main
-            npm install || true
-            pm2 restart valentine-site || pm2 start index.html --name valentine
+            sudo apt update
+            sudo systemctl restart nginx
           EOF
 
