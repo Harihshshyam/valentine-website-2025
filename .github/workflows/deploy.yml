@@ -6,33 +6,34 @@ on:
       - main
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
     defaults:
       run:
         shell: bash
-        working-directory: .
-    steps:
-      - uses: actions/checkout@v3
-      - name: Install dependencies
-        run: npm install
+        working-directory: .  # ensures package.json is found at repo root
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Debug repo
+        run: |
+          echo "Working dir: $PWD"
+          ls -R .
+
       - name: Install SSH key
         uses: shimataro/ssh-key-action@v2
         with:
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          key: ${{ secrets.SSH_KEY }}
           known_hosts: ${{ secrets.KNOWN_HOSTS }}
+
       - name: Deploy via SSH
         run: |
-          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
             cd /var/www/valentine-site
             git pull origin main
             npm install || true
-            pm2 restart valentine || pm2 start index.html --name valentine
+            pm2 restart valentine-site || pm2 start index.html --name valentine
           EOF
 
